@@ -1,49 +1,53 @@
 const express = require('express');
-const Razorpay = require('razorpay');
+const http = require('http');
 const cors = require('cors');
-const crypto = require('crypto');
-require('dotenv').config();
+const mongoose = require('mongoose');
+const session = require('express-session');
+const passport = require('passport');
+const { initSocket } = require('./socket/socketManager');
+const dotenv = require('dotenv');
+
+if (process.env.NODE_ENV === 'production') {
+    dotenv.config({ path: './.env.production' });
+} else {
+    dotenv.config({ path: './.env.development' });
+}
+
+// Passport config
+require('./config/passport');
 
 const app = express();
-app.use(express.json());
+const server = http.createServer(app);
+
+// Initialize Socket.io via a separate module
+const io = initSocket(server);
+app.set('io', io);
+
+// Middleware
 app.use(cors());
+app.use(express.json());
 
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+app.use(
+    session({
+        secret: 'keyboard cat',
+        resave: false,
+        saveUninitialized: false,
+    })
+);
 
-// Route 1: Create an Order
-app.post('/create-order', async (req, res) => {
-    try {
-        const options = {
-            amount: req.body.amount * 100, // amount in paise
-            currency: "INR",
-            receipt: "receipt_order_123",
-        };
+// Passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
 
-        const order = await razorpay.orders.create(options);
-        res.json(order); // Returns the order_id
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
+// Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/products', require('./routes/products'));
+app.use('/api/checkout', require('./routes/checkout'));
 
-// Route 2: Verify Payment Signature
-app.post('/verify-payment', (req, res) => {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-
-    const sign = razorpay_order_id + "|" + razorpay_payment_id;
-    const expectedSign = crypto
-        .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-        .update(sign.toString())
-        .digest("hex");
-
-    if (razorpay_signature === expectedSign) {
-        return res.status(200).json({ message: "Payment verified successfully" });
-    } else {
-        return res.status(400).json({ message: "Invalid signature sent!" });
-    }
-});
-
-app.listen(3000, () => console.log("Server running on port 3000"));
+// Database & Server Start
+const PORT = process.env.PORT || 3000;
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => {
+        server.listen(PORT, () => console.log(`🚀 Server on http://localhost:${PORT}`));
+    })
+    .catch(err => console.log('❌ DB Connection Error:', err));
