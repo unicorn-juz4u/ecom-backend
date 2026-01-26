@@ -24,7 +24,25 @@ const io = initSocket(server);
 app.set('io', io);
 
 // Middleware
-app.use(cors());
+const whitelist = [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'https://www.anjoaura.shop',
+    'https://anjoaura.shop',
+    'https://ecom-wmqw.onrender.com',
+    'https://anjoaura.onrender.com',
+];
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (whitelist.indexOf(origin) !== -1 || !origin) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 app.use(

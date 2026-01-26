@@ -6,7 +6,9 @@ const userSchema = new mongoose.Schema({
     password: { type: String },
     googleId: { type: String, unique: true, sparse: true },
     role: { type: String, enum: ['user', 'affiliate', 'admin'], default: 'user' },
-    affiliateCode: { type: String, unique: true, sparse: true }
+    affiliateCode: { type: String, unique: true, sparse: true },
+    resetPasswordToken: { type: String },
+    resetPasswordExpires: { type: Date }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);
